@@ -1,43 +1,33 @@
 import numpy as np
 import math
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 #import mpl_toolkits.mplot3d.axes3d as p3
 from scipy.constants import k
-import matplotlib.animation as animation
-from matplotlib.animation import FuncAnimation
 import time
 from itertools import product, combinations
 
-writervideo=animation.FFMpegWriter(fps=60)
-#set other parameters of atoms
-epsilon=0.0103 #in eV
-sigma=3.43 #in A
-m=39.948 #amu
 #-----init---------------------------------------------------------------------------------
 
-class Dynamics:
+class Simulation:
     def init (self):
 
         #dimension of the simulation
         self.dim=3
 
-        #read number of atoms from the first line of the xyz file
         self.n_atom=1
         
-        #set velocity and position-array to a zero-array with dimension of number of atoms x dimension (v_x, v_y and v_z for each atom)
-        self.velocity=np.zeros((self.n_atom, self.dim))
-        self.position=np.zeros((self.n_atom, self.dim))
-        self.accel=np.zeros((self.n_atom, self.dim))
+        #set velocity and position-array to a zero-array with dimension of (number of atoms X dimension) 
+        #self.velocity=np.zeros((self.n_atom, self.dim))
+        #self.position=np.zeros((self.n_atom, self.dim))
         
         #just some parameters needed
-        self.mass=m #amu
-        self.T=T #K
-        self.box_len=20 #in m
+        self.box_len=20 #in A
         self.dt=0.01 #in s
-        self.steps=500
+        self.steps=2000
         self.filename='filename'
-    
+        self.bc='HW'
+        self.epsilon=0.0103 #in eV
+        self.sigma=3.40 #in A
+        self.m=39.948 #amu
 
 
 #-----init posi and velocity---------------------------------------------------------------------------------
@@ -49,83 +39,126 @@ class Dynamics:
     #this function sets the component of each velocity to a random value of that normal distribution
     #luckily, numpy has a function that randomizes values considering the chosen distribution
     def init_velocity (self):
-        std_dev=np.sqrt(k*self.T/self.mass)
-        self.velocity=np.random.normal(loc=0, scale=std_dev, size=(self.n_atom, self.dim))*1e10 #in ~m/s *10^-13 deswegen *10^10 für ausgabe in angstrom
-        
-
+        #std_dev=np.sqrt(k*T/self.m)
+        #self.velocity=np.random.normal(loc=0, scale=std_dev, size=(self.n_atom, self.dim))*1e10 #in ~m/s *10^-13 deswegen *10^10 für ausgabe in angstrom
+        R=np.random.rand(self.n_atom, self.dim)-0.5
+        self.velocity=R* (k*T/(self.m*1.602e-19))**0.5 *0
 
     def init_posi_from_file (self):
         #read number of atoms from the first line of the xyz file
         with open(self.filename,'r') as f:
                 self.n_atom=int(f.readline()) 
-        self.x=np.loadtxt(self.filename, skiprows=1, usecols=(0)) 
-        self.y=np.loadtxt(self.filename, skiprows=1, usecols=(1))
-        self.z=np.loadtxt(self.filename, skiprows=1, usecols=(2))
+        self.x=np.loadtxt(self.filename, skiprows=2, usecols=(1)) 
+        self.y=np.loadtxt(self.filename, skiprows=2, usecols=(2))
+        self.z=np.loadtxt(self.filename, skiprows=2, usecols=(3))
         self.position_sw=np.array([self.x, self.y, self.z])
         self.position=np.transpose(self.position_sw)
     
 
     def init_posi_rnd (self):
-        self.position=np.random.random_sample((self.n_atom,self.dim))*0.9*(self.box_len)
+        self.position=np.random.random_sample((self.n_atom,self.dim))*0.9*(self.box_len)+0.05*self.box_len
         self.x=self.position[:,0]
         self.y=self.position[:,1]
         self.z=self.position[:,2]
 
 
-    def move_atoms(self):
-        for i in range(self.n_atom):
-            for j in range(i+1, self.n_atom):
-                r=self.position[i]-self.position[j]
-                r_mag=np.linalg.norm(r)
-                r_norm=r/r_mag
-                if (r_mag <0.9*sigma):
-                    self.position[i]=self.position[i]+(0.4*sigma)*r_norm
-                    self.position[j]=self.position[j]-(0.4*sigma)*r_norm
-            self.check_boundary()        
+
+    
+    def optimize_geo(self):
+        for i in range(800):
+            pe_start=self.pe()
+            particle = np.random.randint(0,self.n_atom,size=None, dtype=int)
+            
+            r=(np.random.random_sample(size=3)-0.5)*2
+            r_magnitude=np.linalg.norm(r)
+            r_norm=r/r_magnitude
+            dr=0.05*self.sigma*r_norm
+            
+            self.position[particle] += dr
+            pe_end=self.pe()
+            if(pe_start<pe_end):
+                self.position[particle] -= dr
+
+
+
 
 
 #-----energies---------------------------------------------------------------------------------
 
-    def pe_pair(self, particle_1, particle_2):
-        r = self.position[particle_1] - self.position[particle_2]
-        r_mag = np.linalg.norm(r)
+    def pe_interaction(self, particle_1, particle_2):
+        r = self.get_min_dist(particle_1, particle_2)
+        r_magnitude = np.linalg.norm(r)
         
-        return 4*epsilon*((sigma/r_mag)**12 - (sigma/r_mag)**6)
+        return 4*self.epsilon*((self.sigma/r_magnitude)**12 - (self.sigma/r_magnitude)**6)
     
 
     def pe(self):
-        total_pe = 0.0
+        pe_total = 0.0
         for i in range(self.n_atom):
             for j in range(i+1, self.n_atom):
-                total_pe += self.pe_pair(i,j)
-        return total_pe
+                pe_total += self.pe_interaction(i,j)
+        return pe_total
     
 
 
     def ekin(self):
-        ekin_tot=0
+        ekin_tot=0.0
         for i in range(self.n_atom):
             v_mag=np.linalg.norm(self.velocity[i])
-            ekin_tot=ekin_tot + 0.5*m*(v_mag**2)
+            ekin_tot +=  0.5*self.m*(v_mag**2)
         return ekin_tot
 
 
 #-----force---------------------------------------------------------------------------------
 
+    def get_min_dist(self, p1, p2):
+        r_real=self.position[p1]-self.position[p2]
+        if self.bc == "hw" or self.bc =="HW":
+            return r_real
+        else:
+            r_x=r_real[0]
+            r_y=r_real[1]    
+            r_z=r_real[2]
+
+
+            if(r_x > self.box_len*0.5):
+                r_real += np.array([-self.box_len,0,0])
+            elif(r_x <= -self.box_len*0.5):
+                r_real += np.array([self.box_len,0,0])
+            else:
+                pass
+
+            if(r_y > self.box_len*0.5):
+                r_real += np.array([0,-self.box_len,0])
+            elif(r_y <= -self.box_len*0.5):
+                r_real += np.array([0,self.box_len,0])
+            else:
+                pass
+
+            if(r_z > self.box_len*0.5):
+                r_real += np.array([0,0,-self.box_len])
+            elif(r_y <= -self.box_len*0.5):
+                r_real += np.array([0,0,self.box_len])
+            else:
+                pass
+            
+            return r_real
+
+
+
+
     #the force is the derivative of the energy (potential)
     #here we use the LJ-12-6-potential, so we have to form the derivative after r
+    #you can only calculate force in a direction by multiplying the force with the unit vector in that direction
     def lj_interaction (self, particle_1, particle_2):
-        r=self.position[particle_1] - self.position[particle_2] #distance between 2 particles in nm
-        #you can only calculate force in a direction by multiplying the force with the unit vector in that direction
-        r_magnitude=np.linalg.norm(r) #magnitude of the vector
-        r_norm=r/r_magnitude #vector in the direction with length of 1
-        if (r_magnitude <= 2*sigma):
-        #force in a direction = force*(r_i / |r|)
-            f_magnitude=(48*epsilon*(sigma**12)/(r_magnitude**13)-24*epsilon*(sigma**6)/(r_magnitude**7))
-            f_vector = f_magnitude*r_norm
-        else:
-            f_vector=[0,0,0]
+        r=self.get_min_dist(particle_1, particle_2) 
+        r_magnitude=np.linalg.norm(r) 
+        r_norm=r/r_magnitude 
+        f_magnitude= 48*self.epsilon*(self.sigma**12/r_magnitude**13) - 24*self.epsilon*(self.sigma**6/r_magnitude**7)
+        f_vector = f_magnitude*r_norm #force in a direction = force*(r_i / |r|)
         return f_vector #return the force vector with the forces acting in each direction as components
+
+    
 
 
 
@@ -142,12 +175,12 @@ class Dynamics:
 #-----integrator---------------------------------------------------------------------------------
 
     def velocity_verlet (self):
+        accel_0=np.zeros((self.n_atom, self.dim))
         energy=open('Energy.txt', 'w')
         trj=open('trj.xyz', 'w')
-        #trj.writelines(str(self.n_atom)+'\n'+'md-sim'+'\n')
 #-----velocity verlet---------------------------------------------------------------------------------
         for i in range(self.steps):
-            self.position = self.position + 0.5*self.accel*(self.dt**2) + self.velocity*self.dt 
+            self.position = self.position + 0.5*accel_0*(self.dt**2) +self.velocity*self.dt 
             self.check_boundary()
             self.x=self.position[:,0]
             self.y=self.position[:,1]
@@ -158,14 +191,11 @@ class Dynamics:
                 yp=self.y[j]
                 zp=self.z[j]
                 trj.writelines(' '+'Ar'+' '+str('{0:.5f}'.format(xp))+' '+str('{0:.5f}'.format(yp))+' '+str('{0:.5f}'.format(zp))+'\n')
-            
-            #trj.writelines('\n'+str('{0:.5f}'.format(self.box_len))+' ' + '0.00000' +' '+ '0.00000'+'\n'+ '0.00000' +' '+ str('{0:.5f}'.format(self.box_len))+' ' + '0.00000'+'\n' + '0.00000'+' '+ '0.00000' + ' '+ str('{0:.5f}'.format(self.box_len))+'\n' )
-            #trj.writelines('\n') 
-
+           
             forces=np.array([self.lj_choose(p) for p in range(self.n_atom)])
-            accel=(forces/self.mass) #in eV/A*amu
-            self.velocity = self.velocity + 0.5*(self.accel+accel)*self.dt
-            self.accel=accel
+            accel_1=(forces/self.m) #in eV/A*amu
+            self.velocity = self.velocity + 0.5*(accel_0+accel_1)*self.dt
+            accel_0=accel_1
 #-----for energy plot---------------------------------------------------------------------------------
             pe_tot=self.pe()
             ekin_tot=self.ekin()
@@ -176,46 +206,61 @@ class Dynamics:
 
 
     def check_boundary(self):
-        for n in range(self.n_atom):
-            for c in range(0,2):
-                if (self.position[n,c]>self.box_len):
-                    self.position[n,c]=self.position[n,c]-self.box_len
-                if (self.position[n,c]<=0):
-                    self.position[n,c]=self.position[n,c]+self.box_len
+        if self.bc == "pbc" or self.bc =="PBC":
+            for n in range(self.n_atom):
+                for c in range(0,3):
+                    if (self.position[n,c]>self.box_len):
+                        self.position[n,c]=self.position[n,c]-self.box_len
+                    if (self.position[n,c]<=0):
+                        self.position[n,c]=self.position[n,c]+self.box_len
+        else:
+            for n in range(self.n_atom):
+                for c in range(0,3):
+                    if (abs(self.position[n,c]>=self.box_len) or abs(self.position[n,c]<=0)):
+                        self.velocity[n,c] = -self.velocity[n,c]
 
 
 
 
-
-#choose the temperature
-temperature=input("Choose the simulation temperature in Kelvin:")
+#choose the temperature and boundary conditions
+temperature=input("Choose the simulation temperature in Kelvin: ")
 T=float(temperature)
+j=False
+while j is False:
+    boundary=input("Do you want Periodic Boundary Conditions or Hard Walls? Please Type either PBC or HW: ")
+    if boundary == 'hw' or boundary == 'HW' or boundary == 'pbc' or boundary == 'PBC' :
+        j=True
+    else:
+        print("Wrong input, please write either PBC or HW!")
 #-----start program-------------------------------------------------------------------------------------------------
-dyn=Dynamics()
+dyn=Simulation()
 dyn.init()
+dyn.bc=boundary
 i=False
 while i is False:
-    inp_method=input("Do you have a file in xzy format which you would like to simulate? Type Y or N:")
+    inp_method=input("Do you have a file in xzy format which you would like to simulate? Type Y or N: ")
     if inp_method=='Y' or inp_method=='y':
-        filename=input('Please enter your exact filename:')
+        filename=input('Please enter your exact filename: ')
         dyn.filename=filename
         dyn.init_posi_from_file()
         dyn.init_velocity()
         i=True
-    if inp_method=='N' or inp_method=='n':
-        n_of_atom=input('Please enter your desired number of atoms:')
+    elif inp_method=='N' or inp_method=='n':
+        n_of_atom=input('Please enter your desired number of atoms: ')
         dyn.n_atom=int(n_of_atom)
         dyn.init_posi_rnd()
+        t1=time.time()
+        dyn.optimize_geo()
+        t2=time.time()
+        print("optimize time=", t2-t1)
         dyn.init_velocity()
-        dyn.move_atoms()
-        #dyn.minimize()
         i=True
     else:
         print('False input, please write either Y or N!')
-
-
-
+        
+t_start=time.time()
 dyn.velocity_verlet()
-
+t_end=time.time()
+print("MD time=",t_end-t_start)
 
 
