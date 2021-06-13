@@ -12,7 +12,7 @@ Initialization:
 	3) You can use a pre-existing file in xyz Format as input, if you type in y or Y if the program asks you if you have a pre-existing file
 	4) Alternatively, if you dont have a xyz file you can randomize the initial positions. Type n or N if the program asks you whether you have a pre-existing file.
 		- the coordinates of the atoms then have to be optimized, so that no atoms are ontop of each other
-		- the optimizer runs for 400 steps before the actual simulation starts
+		- the optimizer runs for 600 steps before the actual simulation starts
 	5) The atom velocities get randomzied in relation to the input temperature
 
 
