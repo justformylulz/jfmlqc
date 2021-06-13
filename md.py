@@ -5,8 +5,8 @@
 #               USED POTENTIAL: LENNARD-JONES-12-6                  #
 #               POSSIBLE ATOMS TO SIMULATE: Ar                      #
 #               ONLY GAS PHASE                                      #
-#               SIMULATION BOX LENGTH: 20 A                         #
 #       02.06.2021                          AUTHOR: @AZAD KIRSAN    #
+#                                                                   #
 #-------------------------------------------------------------------#
 
 
@@ -24,8 +24,8 @@ import numpy as np
 import math
 from scipy.constants import k
 import time
-from itertools import product, combinations
-
+#from itertools import product, combinations
+import sys
 #-----------------------------------------------#
 #                                               #
 #           INITIALIZATION OF PARAMETERS        #
@@ -37,7 +37,7 @@ class Simulation:
         self.dim=3
         self.n_atom=1
         self.box_len=20 #in A
-        self.dt=0.01 #in s
+        self.dt=0.005 #in s
         self.steps=2000
         self.filename='filename'
         self.bc='HW'
@@ -53,14 +53,13 @@ class Simulation:
 #-------------------------------------------------------#
 
     def init_velocity (self):
-        #std_dev=np.sqrt(k*T/self.m)
-        #self.velocity=np.random.normal(loc=0, scale=std_dev, size=(self.n_atom, self.dim))*1e10
+       # std_dev=np.sqrt(k*T/self.m)
+       # self.velocity=np.random.normal(loc=0, scale=std_dev, size=(self.n_atom, self.dim))*1e10
         
-        R=np.random.rand(self.n_atom, self.dim)-0.5
-        self.velocity=R* (k*T/(self.m*1.602e-19))**0.5 #in eV/amu
+        P=2*(np.random.rand(self.n_atom, self.dim)-0.5)
+        self.velocity=P* (k*T/(self.m*1.602e-19))**0.5 #in eV/amu
 
     def init_posi_from_file (self):
-        #read number of atoms from the first line of the xyz file
         with open(self.filename,'r') as f:
                 self.n_atom=int(f.readline()) 
         self.x=np.loadtxt(self.filename, skiprows=2, usecols=(1)) 
@@ -78,14 +77,14 @@ class Simulation:
 
     
     def optimize_geo(self):
-        for i in range(800):
+        for i in range(600):
             pe_start=self.pe()
             particle = np.random.randint(0,self.n_atom,size=None, dtype=int)
             
             r=(np.random.random_sample(size=3)-0.5)*2
             r_magnitude=np.linalg.norm(r)
             r_norm=r/r_magnitude
-            dr=0.075*self.sigma*r_norm
+            dr=0.05*self.sigma*r_norm
             
             self.position[particle] += dr
             pe_end=self.pe()
@@ -100,7 +99,7 @@ class Simulation:
 #                                           #
 #-------------------------------------------#
 
-    def pe_interaction(self, particle_1, particle_2):
+    def pe_interaction(self, particle_1, particle_2): #get energy contribution from p1 to p2
         r = self.get_min_dist(particle_1, particle_2)
         r_magnitude = np.linalg.norm(r)
         
@@ -158,7 +157,7 @@ class Simulation:
 
             if(r_z > self.box_len*0.5):
                 r_real += np.array([0,0,-self.box_len])
-            elif(r_y <= -self.box_len*0.5):
+            elif(r_z <= -self.box_len*0.5):
                 r_real += np.array([0,0,self.box_len])
             else:
                 pass
@@ -177,13 +176,13 @@ class Simulation:
         r_magnitude=np.linalg.norm(r) 
         r_norm=r/r_magnitude 
         f_magnitude= 48*self.epsilon*(self.sigma**12/r_magnitude**13) - 24*self.epsilon*(self.sigma**6/r_magnitude**7)
-        f_vector = f_magnitude*r_norm #force in a direction = force*(r_i / |r|)
+        f_vector = f_magnitude*r_norm
         return f_vector #return the force vector with the forces acting in each direction as components
 
     
 
     #determine all forces acting on a particle
-    def lj_choose (self, p1):
+    def lj_force (self, p1):
         force=np.zeros(shape=3)
         for p2 in range(self.n_atom): 
             if(p1 == p2): #so the program doesnt calculate the force of the particle with itself
@@ -205,7 +204,16 @@ class Simulation:
         
 
         for i in range(self.steps):
+           
+           # pe_tot=self.pe()
+           # ekin_tot=self.ekin()
+           # e_tot=pe_tot+ekin_tot
+           # energy.writelines(str(e_tot)+'\t'+str(pe_tot)+'\t'+str(ekin_tot)+'\n')
+        
             self.position = self.position + 0.5*accel_0*(self.dt**2) +self.velocity*self.dt 
+            
+            
+            pe_tot=self.pe()
             
             self.check_boundary()
             
@@ -220,18 +228,17 @@ class Simulation:
                 trj.writelines(' '+'Ar'+' '+str('{0:.5f}'.format(xp))+' '+str('{0:.5f}'.format(yp))+' '+str('{0:.5f}'.format(zp))+'\n')
            
             
-            forces=np.array([self.lj_choose(p) for p in range(self.n_atom)])
+            forces=np.array([self.lj_force(p) for p in range(self.n_atom)])
             
             accel_1=(forces/self.m) #in eV/A*amu
             
             self.velocity = self.velocity + 0.5*(accel_0+accel_1)*self.dt
             
+            ekin_tot=self.ekin()
             accel_0=accel_1
             
-
-            pe_tot=self.pe()
-            ekin_tot=self.ekin()
             e_tot=pe_tot+ekin_tot
+
             energy.writelines(str(e_tot)+'\t'+str(pe_tot)+'\t'+str(ekin_tot)+'\n')
         energy.close()
         trj.close()
@@ -277,9 +284,15 @@ dyn.init()
 dyn.bc=boundary
 i=False
 while i is False:
-    inp_method=input("Do you have a file in xzy format which you would like to simulate? Type Y or N: ")
+    inp_method=input("Do you have a file in xyz format which you would like to simulate? Type Y or N: ")
     if inp_method=='Y' or inp_method=='y':
         filename=input('Please enter your exact filename: ')
+        try:
+            f=open(filename)
+        except IOError:
+            sys.exit("THE FILE", "", filename, "","DOES NOT EXIST! PLEASE START OVER.")
+        finally:
+            f.close()
         dyn.filename=filename
         dyn.init_posi_from_file()
         dyn.init_velocity()
@@ -291,7 +304,7 @@ while i is False:
         t1=time.time()
         dyn.optimize_geo()
         t2=time.time()
-        print("optimize time=", t2-t1)
+        print("Optimize time=", t2-t1)
         dyn.init_velocity()
         i=True
     else:
