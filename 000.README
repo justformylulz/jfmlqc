@@ -8,12 +8,12 @@
 Initialization:
 	1) As a first Input you have to type in your desired temperature for the simulation (in K, datatype = float)
 	2) You have to choose whether you want periodic boundary conditions (pbc) or hard walls (hw) at the borders of the box
-		- the standard box size is 15 Angstrom
+		- the standard box size is 20 Angstrom
 	3) You can use a pre-existing file in xyz Format as input, if you type in y or Y if the program asks you if you have a pre-existing file
 	4) Alternatively, if you dont have a xyz file you can randomize the initial positions. Type n or N if the program asks you whether you have a pre-existing file.
 		- the coordinates of the atoms then have to be optimized, so that no atoms are ontop of each other
 		- the optimizer runs for 600 steps before the actual simulation starts
-	5) The atom velocities get randomzied in relation to the input temperature
+	5) The atom velocities get randomzied in relation to the user input temperature
 
 
 MD-Simulation:
@@ -34,7 +34,8 @@ Output:
 			- 2nd row : the timestep
 			- rest : Atom type, x-coordinate, y-coordinate, z-coordinate
 			=> gets repeated for every timestep
-
+	
+	In addition the program prints the elapsed time for the geometry optimizer (if the atom positions have to be randomized) and the MD-time to the terminal.
 
 Visualization:
 	The Energy can be visualized by any plotting program like SciDavis, Gnuplot or even Microsoft Excel.
@@ -44,5 +45,5 @@ Visualization:
 Problematic Inputs:
 	Don't use too many Atoms (not more than 40 for standard parameters) or the simulation might crash because the box is too small.
 	If you want to simulate more atoms, you have to change the "self.box_len" parameter in the program.
-	The simulation time scales very hard with the number of atoms, for 40 atoms the simulation takes about 60s and for 50 atoms the simulation may take up to 180s.
-	Too high temperatures (T>50000 K) may cause the Energy to get unstable because the timestep is too large for the given velocities.
+	The simulation time scales very hard with the number of atoms.
+	Too high temperatures (T>20000 K) may cause the Energy to get unstable because the timestep is too large for the resulting velocities.
