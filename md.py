@@ -24,8 +24,8 @@ import numpy as np
 import math
 from scipy.constants import k
 import time
-#from itertools import product, combinations
 import sys
+
 #-----------------------------------------------#
 #                                               #
 #           INITIALIZATION OF PARAMETERS        #
@@ -38,7 +38,7 @@ class Simulation:
         self.n_atom=1
         self.box_len=20 #in A
         self.dt=0.01 #in s
-        self.steps=2000
+        self.steps=steps
         self.filename='filename'
         self.bc='HW'
         self.epsilon=0.0103 #in eV #
@@ -53,12 +53,10 @@ class Simulation:
 #-------------------------------------------------------#
 
     def init_velocity (self):
-       # std_dev=np.sqrt(k*T/self.m)
-       # self.velocity=np.random.normal(loc=0, scale=std_dev, size=(self.n_atom, self.dim))*1e10
         
         P=2*(np.random.rand(self.n_atom, self.dim)-0.5) #(N x dim) array filled with rnd numbers from -1 to 1
-        self.velocity=P* (k*T/(self.m*1.602e-19))**0.5 #in eV/amu
-
+        self.velocity=P*(2*k*T/(self.m*1.602e-19))**0.5 #in eV/amu
+    
     def init_posi_from_file (self):
         with open(self.filename,'r') as f:
                 self.n_atom=int(f.readline()) 
@@ -68,6 +66,12 @@ class Simulation:
         self.position_sw=np.array([self.x, self.y, self.z])
         self.position=np.transpose(self.position_sw)
     
+    def check_file_inbox (self):
+        if np.all(self.position < self.box_len) == True and np.all(self.position >= 0) == True:
+            print("Every atom is inside the box.")
+        else:
+            print("!!! ERROR !!! ATOM OUT OF BOUNDS! EXITING THE PROGRAM!")
+            sys.exit()
 
     def init_posi_rnd (self):
         self.position=np.random.random_sample((self.n_atom,self.dim))*0.8*(self.box_len)+0.1*self.box_len
@@ -227,7 +231,7 @@ class Simulation:
             for j in range(self.n_atom):                                               
                 xp=self.x[j]                                                            
                 yp=self.y[j]                                                            
-                zp=self.z[j]                                                            #
+                zp=self.z[j]                                                            
                 trj.writelines(' '+'Ar'+' '+str('{0:.5f}'.format(xp))+' '+str('{0:.5f}'.format(yp))+' '+str('{0:.5f}'.format(zp))+'\n')
 #########################################################################################################################################
 
@@ -259,8 +263,9 @@ class Simulation:
 #                               #
 #-------------------------------#
 
-temperature=input("Choose the simulation temperature in Kelvin: ")
-T=float(temperature)
+T=float(input("Choose the simulation temperature in Kelvin: "))
+steps=int(input("Please state your desired number of timesteps (dt=0.01s) as an integer number: "))
+
 j=False
 while j is False:
     boundary=input("Do you want Periodic Boundary Conditions or Hard Walls? Please Type either PBC or HW: ")
@@ -268,8 +273,6 @@ while j is False:
         j=True
     else:
         print("Wrong input, please write either PBC or HW!")
-
-
 
 dyn=Simulation()
 dyn.init()
@@ -279,16 +282,18 @@ i=False
 while i is False:
     inp_method=input("Do you have a file in xyz format which you would like to simulate? Type Y or N: ")
     if inp_method=='Y' or inp_method=='y':
-        filename=input('Please enter your exact filename: ')
+        filename=input('Please enter your exact filename (DONT FORGET THE FILE EXTENSION): ')
 
         try:
             f=open(filename)
-        except IOError:
-            sys.exit("THE FILE", "", filename, "","DOES NOT EXIST! PLEASE START OVER.")
-        finally:
-            f.close()
+        except FileNotFoundError:
+            print("!!! ERROR !!! THE FILE", "", filename, "","DOES NOT EXIST! PLEASE START OVER.")
+            sys.exit()
+        f.close()
+
         dyn.filename=filename
         dyn.init_posi_from_file()
+        dyn.check_file_inbox()        
         dyn.init_velocity()
         i=True
 
@@ -296,20 +301,22 @@ while i is False:
         n_of_atom=input('Please enter your desired number of atoms: ')
         dyn.n_atom=int(n_of_atom)
         dyn.init_posi_rnd()
+        print("\n"+"-----Starting the geometry optimization-----"+"\n")
         t1=time.time()
         dyn.optimize_geo()
         t2=time.time()
-        print("Optimize time=", t2-t1)
+        print("Optimize time: ", t2-t1, "s")
         dyn.init_velocity()
         i=True
     else:
         print('False input, please write either Y or N!')
-        
+
+print("\n" + "-----Starting the simulation-----"+ "\n")        
 t_start=time.time()
 dyn.velocity_verlet()
 t_end=time.time()
-print("MD time=",t_end-t_start)
-
+print("MD time: ",t_end-t_start, "s")
+print("\n"+"-----The program was executed successfully-----")
 
 #-------------------------------#
 #                               #
