@@ -44,7 +44,7 @@ class Simulation:
         self.epsilon=0.0103 #in eV #
         self.sigma=3.40 #in A      # LJ parameters
         self.m=39.948 #amu
-
+        self.pot=pot
 
 #-------------------------------------------------------#
 #                                                       #
@@ -56,7 +56,7 @@ class Simulation:
         
         P=2*(np.random.rand(self.n_atom, self.dim)-0.5) #(N x dim) array filled with rnd numbers from -1 to 1
         self.velocity=P*(2*k*T/(self.m*1.602e-19))**0.5 #in eV/amu
-    
+
     def init_posi_from_file (self):
         with open(self.filename,'r') as f:
                 self.n_atom=int(f.readline()) 
@@ -105,9 +105,15 @@ class Simulation:
     def pe_interaction(self, particle_1, particle_2): #get energy contribution from p1 to p2
         r = self.get_min_dist(particle_1, particle_2)
         r_magnitude = np.linalg.norm(r)
-        
-        return 4*self.epsilon*((self.sigma/r_magnitude)**12 - (self.sigma/r_magnitude)**6)
-    
+
+        if self.pot == "hs" or self.pot == "HS":
+            if r_magnitude < (2**(1/6))*self.sigma:
+                return 4*self.epsilon*((self.sigma/r_magnitude)**12 - (self.sigma/r_magnitude)**6) + self.epsilon
+            elif r_magnitude >= (2**(1/6))*self.sigma:
+                return 0
+            
+        else:
+            return 4*self.epsilon*((self.sigma/r_magnitude)**12 - (self.sigma/r_magnitude)**6)
 
     def pe(self):
         pe_total = 0.0
@@ -177,8 +183,16 @@ class Simulation:
     def lj_interaction (self, particle_1, particle_2):
         r=self.get_min_dist(particle_1, particle_2) 
         r_magnitude=np.linalg.norm(r) 
-        r_norm=r/r_magnitude 
-        f_magnitude= 48*self.epsilon*(self.sigma**12/r_magnitude**13) - 24*self.epsilon*(self.sigma**6/r_magnitude**7)
+        r_norm=r/r_magnitude
+        
+        if self.pot=="hs" or self.pot =="HS":
+            if r_magnitude < (2**(1/6))*self.sigma:
+                f_magnitude= 48*self.epsilon*(self.sigma**12/r_magnitude**13) - 24*self.epsilon*(self.sigma**6/r_magnitude**7)
+            elif r_magnitude >= (2**(1/6))*self.sigma:
+                f_magnitude=0
+        else:
+            f_magnitude= 48*self.epsilon*(self.sigma**12/r_magnitude**13) - 24*self.epsilon*(self.sigma**6/r_magnitude**7)
+
         f_vector = f_magnitude*r_norm
         return f_vector #return the force vector with the forces acting in each direction as components
 
@@ -264,15 +278,24 @@ class Simulation:
 #-------------------------------#
 
 T=float(input("Choose the simulation temperature in Kelvin: "))
-steps=int(input("Please state your desired number of timesteps (dt=0.01s) as an integer number: "))
+steps=int(input("Please state your desired number of timesteps as an integer number: "))
 
 j=False
 while j is False:
-    boundary=input("Do you want Periodic Boundary Conditions or Hard Walls? Please Type either PBC or HW: ")
+    boundary=input("Do you want Periodic Boundary Conditions or Hard Walls? Please type either PBC or HW: ")
     if boundary == 'hw' or boundary == 'HW' or boundary == 'pbc' or boundary == 'PBC' :
         j=True
     else:
         print("Wrong input, please write either PBC or HW!")
+
+q=False
+while q is False:
+    pot=input("Do you want to use the Lennard-Jones or the Hard-Spheres potential? Please type either LJ or HS: ")
+    if pot == "hs" or pot =="HS" or pot =="lj" or pot =="LJ":
+        q=True
+    else:
+        print("Wrong input, please write either LJ or HS!")
+
 
 dyn=Simulation()
 dyn.init()
@@ -301,11 +324,13 @@ while i is False:
         n_of_atom=input('Please enter your desired number of atoms: ')
         dyn.n_atom=int(n_of_atom)
         dyn.init_posi_rnd()
+
         print("\n"+"-----Starting the geometry optimization-----"+"\n")
         t1=time.time()
         dyn.optimize_geo()
         t2=time.time()
         print("Optimize time: ", t2-t1, "s")
+        
         dyn.init_velocity()
         i=True
     else:

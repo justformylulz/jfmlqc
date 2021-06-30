@@ -13,14 +13,16 @@ Initialization:
 	3) You have to choose whether you want periodic boundary conditions (pbc) or hard walls (hw) at the borders of the cubic box
 		- the standard box size is 20 Angstrom per side
 
-	4) You can use a pre-existing file in xyz Format as input, if you type in y or Y if the program asks you if you have a pre-existing file
+	4) You then have to choose whether you want to use the Lennard-Jones-12-6 potential or the hard spheres potential. Type LJ or HS.
+
+	5) You can use a pre-existing file in xyz Format as input, if you type in y or Y if the program asks you if you have a pre-existing file
 		- IMPORTANT: please check that every atom is inside the simulation box, so every coordinate is in [0,20[
 
-	5) Alternatively, if you dont have a xyz file you can randomize the initial positions. Type n or N if the program asks you whether you have a pre-existing file.
+	6) Alternatively, if you dont have a xyz file you can randomize the initial positions. Type n or N if the program asks you whether you have a pre-existing file.
 		- the coordinates of the atoms then have to be optimized, so that no atoms are ontop of each other
 		- the optimizer runs for 600 steps before the actual simulation starts
 
-	6) The atom velocities get randomzied in relation to the user input temperature
+	7) The atom velocities get randomzied in relation to the user input temperature
 
 
 MD-Simulation:
