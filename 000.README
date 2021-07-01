@@ -8,7 +8,7 @@
 Initialization:
 	1) As a first input you have to type in your desired temperature for the simulation (in K, datatype = float)
 
-	2) As a second input you have to define the number of steps for a timestep of 0.01s.
+	2) As a second input you have to define the number of steps for a timestep of 0.01fs.
 
 	3) You have to choose whether you want periodic boundary conditions (pbc) or hard walls (hw) at the borders of the cubic box
 		- the standard box size is 20 Angstrom per side

@@ -2,10 +2,9 @@
 #-------------------------------------------------------------------#
 #                                                                   #
 #               MOLECULAR DYNAMICS SIMULATION                       #
-#               USED POTENTIAL: LENNARD-JONES-12-6                  #
+#               USED POTENTIAL: LENNARD-JONES-12-6 / HARD SPHERES   #
 #               POSSIBLE ATOMS TO SIMULATE: Ar                      #
-#               ONLY GAS PHASE                                      #
-#       02.06.2021                          AUTHOR: @AZAD KIRSAN    #
+#       01.07.2021                          AUTHOR: @AZAD KIRSAN    #
 #                                                                   #
 #-------------------------------------------------------------------#
 
@@ -37,9 +36,9 @@ class Simulation:
         self.dim=3
         self.n_atom=1
         self.box_len=20 #in A
-        self.dt=0.01 #in s
+        self.dt=0.01 # I said it was s in the presentation, but its actually fs.
         self.steps=steps
-        self.filename='filename'
+        self.filename='filename' 
         self.bc='HW'
         self.epsilon=0.0103 #in eV #
         self.sigma=3.40 #in A      # LJ parameters
@@ -55,7 +54,7 @@ class Simulation:
     def init_velocity (self):
         
         P=2*(np.random.rand(self.n_atom, self.dim)-0.5) #(N x dim) array filled with rnd numbers from -1 to 1
-        self.velocity=P*(2*k*T/(self.m*1.602e-19))**0.5 #in eV/amu
+        self.velocity=P*(2*k*T/(self.m*1.602e-19))**0.5 #in sqrt(eV/amu)
 
     def init_posi_from_file (self):
         with open(self.filename,'r') as f:
@@ -120,7 +119,7 @@ class Simulation:
         for i in range(self.n_atom):
             for j in range(i+1, self.n_atom):
                 pe_total += self.pe_interaction(i,j)
-        return pe_total
+        return pe_total #in eV
     
 
 
@@ -129,7 +128,7 @@ class Simulation:
         for i in range(self.n_atom):
             v_mag=np.linalg.norm(self.velocity[i])
             ekin_tot +=  0.5*self.m*(v_mag**2)
-        return ekin_tot
+        return ekin_tot #in eV
 
 
 #-------------------------------------------#
@@ -173,12 +172,6 @@ class Simulation:
             
             return r_real
 
-
-
-
-    #the force is the derivative of the energy (potential)
-    #here we use the LJ-12-6-potential, so we have to form the derivative after r
-    #calculate the force in a direction by multiplying the force with the unit vector in that direction
     
     def lj_interaction (self, particle_1, particle_2):
         r=self.get_min_dist(particle_1, particle_2) 
@@ -232,7 +225,7 @@ class Simulation:
             
             accel_0=accel_1 #update acceleration
         
-#########################################################################################################################################
+########################################just for the output###############################################################################
             pe_tot=self.pe()                                                            
             ekin_tot=self.ekin()                                                        
             e_tot=pe_tot+ekin_tot                                                       
